@@ -23,3 +23,6 @@ venv/
 
 # Logs
 *.log
+
+# Python packaging
+*.egg-info/
