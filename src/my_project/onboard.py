@@ -10,6 +10,7 @@ import argparse
 import csv
 import datetime as dt
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -92,7 +93,20 @@ def upload(page, label: str, path: Path) -> None:
     chooser.value.set_files(str(path))
 
 
-def run_browser(cfg: dict, records: list[dict], ppmd: Path, tprm: Path, out_dir: Path, submit: bool) -> None:
+def save_unique(src: Path, dest_dir: Path, name: str) -> Path:
+    """Copy src into dest_dir without overwriting an existing file."""
+    target = dest_dir / name
+    n = 1
+    while target.exists():
+        target = dest_dir / f"{Path(name).stem} ({n}){Path(name).suffix}"
+        n += 1
+    shutil.copyfile(src, target)
+    return target
+
+
+def run_browser(
+    cfg: dict, records: list[dict], ppmd: Path, tprm: Path, out_dir: Path, submit: bool, dest: Path | None
+) -> None:
     from playwright.sync_api import sync_playwright
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -125,6 +139,8 @@ def run_browser(cfg: dict, records: list[dict], ppmd: Path, tprm: Path, out_dir:
         filled = out_dir / dl.value.suggested_filename
         fill_template(template, filled, records)
         print(f"Filled template: {filled}")
+        if dest:
+            print(f"Saved a copy to contractor folder: {save_unique(filled, dest, filled.name)}")
 
         upload(page, "Upload Template", filled)
         upload(page, "upload the PPMD approval", ppmd)
@@ -143,9 +159,15 @@ def run_browser(cfg: dict, records: list[dict], ppmd: Path, tprm: Path, out_dir:
             banner = page.get_by_text(re.compile(r"HRC\d+ created")).first
             banner.wait_for(timeout=90000)
             ticket = re.search(r"HRC\d+", banner.inner_text()).group()
-            page.screenshot(path=str(out_dir / "confirmation.png"), full_page=True)
+            # Scroll to top so the banner and the "Number" field are both in frame.
+            page.evaluate("window.scrollTo(0, 0)")
+            page.get_by_text(ticket, exact=True).first.wait_for()
+            shot = out_dir / f"{ticket}_confirmation.png"
+            page.screenshot(path=str(shot))
             (out_dir / "ticket.txt").write_text(ticket + "\n")
-            print(f"Submitted: {ticket}. Confirmation screenshot saved.")
+            print(f"Submitted: {ticket}. Confirmation screenshot: {shot}")
+            if dest:
+                print(f"Saved a copy to contractor folder: {save_unique(shot, dest, shot.name)}")
         else:
             print("Not submitted.")
         ctx.close()
@@ -157,21 +179,37 @@ def main() -> None:
     ap.add_argument("--csv", help="CSV with columns: " + ",".join(PERSON_COLUMNS))
     for key in PERSON_COLUMNS:
         ap.add_argument(f"--{key.replace('_', '-')}", dest=key)
-    ap.add_argument("--ppmd", required=True, type=Path, help="PPMD approval file for this request")
+    ap.add_argument("--ppmd", type=Path, help="PPMD approval file (default: PPMD-Approval.pdf in --folder)")
+    ap.add_argument("--folder", type=Path, help="contractor folder: source of PPMD approval, destination for the filled Excel and screenshot")
     ap.add_argument("--start-date", type=dt.date.fromisoformat, default=dt.date.today(), help="YYYY-MM-DD (default today)")
     ap.add_argument("--out", type=Path, default=ROOT / "output" / dt.datetime.now().strftime("%Y%m%d-%H%M%S"))
     ap.add_argument("--submit", action="store_true", help="actually submit (default is dry run)")
+    ap.add_argument("--prepare-only", action="store_true", help="no browser: fill the blank template and save it to --folder")
     args = ap.parse_args()
 
     cfg = load_config(Path(args.config))
     tprm = ROOT / cfg["tprm_pdf"]
-    for label, p in (("PPMD approval", args.ppmd), ("TPRM approval", tprm)):
+    if args.folder and not args.folder.is_dir():
+        sys.exit(f"Contractor folder not found: {args.folder}")
+    ppmd = args.ppmd or (args.folder / "PPMD-Approval.pdf" if args.folder else None)
+    if ppmd is None:
+        sys.exit("Give --ppmd or --folder")
+    for label, p in (("PPMD approval", ppmd), ("TPRM approval", tprm)):
         if not Path(p).is_file():
             sys.exit(f"{label} not found: {p}")
     people = read_people(args)
     records = build_records(people, cfg["fixed_columns"], args.start_date)
     print(f"{len(people)} contractor(s); start {args.start_date}, end {args.start_date + dt.timedelta(days=364)}")
-    run_browser(cfg, records, args.ppmd, tprm, args.out, args.submit)
+    if args.prepare_only:
+        if not args.folder:
+            sys.exit("--prepare-only needs --folder")
+        args.out.mkdir(parents=True, exist_ok=True)
+        filled = args.out / "ServiceNow Bulk Upload Onboarding US.xlsx"
+        fill_template(ROOT / cfg["blank_template"], filled, records)
+        print(f"Filled template saved to: {save_unique(filled, args.folder, filled.name)}")
+        print("Upload checklist: filled template, PPMD approval (in the same folder), TPRM approval:", tprm)
+        return
+    run_browser(cfg, records, ppmd, tprm, args.out, args.submit, args.folder)
 
 
 if __name__ == "__main__":

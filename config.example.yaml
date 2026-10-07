@@ -11,6 +11,7 @@ gps_type: Federal
 
 # Standing TPRM approval (relative to the repo root)
 tprm_pdf: inputs/tprm_approval.pdf
+blank_template: inputs/blank_template.xlsx   # blank copy of the form's downloadable template
 
 # Template values identical for every contractor (column letter -> value).
 # Per-contractor columns (C, D, Z, AA, AB, AC, AF, AG) are filled by the script.
