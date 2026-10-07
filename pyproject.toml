@@ -8,10 +8,10 @@ version = "0.1.0"
 description = "A new project."
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["playwright", "pyyaml", "lxml"]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "openpyxl"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

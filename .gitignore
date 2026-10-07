@@ -26,3 +26,9 @@ venv/
 
 # Python packaging
 *.egg-info/
+
+# Automation: private inputs, outputs, browser session
+inputs/
+output/
+.browser_profile/
+config.yaml

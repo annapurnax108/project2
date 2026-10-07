@@ -1,0 +1,37 @@
+# Copy to config.yaml (git-ignored) and fill in real values.
+url: https://deloitteus.service-now.com/tod?id=sc_cat_item&sys_id=<item-id>
+
+# Form dropdowns
+contractor_location: US
+request_type: Onboarding
+memberfirm_employee: "No"
+acknowledgement_prefix: "YES, I have successfully completed"   # start of the option text
+gps_project: "Yes"
+gps_type: Federal
+
+# Standing TPRM approval (relative to the repo root)
+tprm_pdf: inputs/tprm_approval.pdf
+
+# Template values identical for every contractor (column letter -> value).
+# Per-contractor columns (C, D, Z, AA, AB, AC, AF, AG) are filled by the script.
+fixed_columns:
+  A: OGC contact name
+  B: ogc.contact@example.com
+  E: Engaging Manager Name
+  F: engaging.manager@example.com
+  G: Sponsoring PPMD Name
+  H: ppmd@example.com
+  I: Deloitte Consulting LLP
+  J: Cost Center Name
+  K: 123456789
+  L: Deloitte Office address
+  M: External-Other
+  N: USA
+  P: Deloitte Office address
+  Q: Third party external
+  R: Vendor Name
+  S: "(555) 555-5555"
+  T: vendor@example.com
+  X: Client Billable
+  AD: No Laptop
+  AE: No access required - Person ID only (no network/no email/no Teams/no Outlook)
